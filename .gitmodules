@@ -1,0 +1,18 @@
+[submodule "vulkan/third_party/glfw"]
+	path = vulkan/third_party/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "vulkan/third_party/cglm"]
+	path = vulkan/third_party/cglm
+	url = https://github.com/recp/cglm.git
+[submodule "vulkan/third_party/vma"]
+	path = vulkan/third_party/vma
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "vulkan/third_party/cjson"]
+	path = vulkan/third_party/cjson
+	url = https://github.com/DaveGamble/cJSON.git
+[submodule "vulkan/third_party/nuklear"]
+	path = vulkan/third_party/nuklear
+	url = https://github.com/Immediate-Mode-UI/Nuklear.git
+[submodule "vulkan/third_party/stb"]
+	path = vulkan/third_party/stb
+	url = https://github.com/nothings/stb.git

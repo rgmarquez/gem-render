@@ -1,0 +1,22 @@
+{
+    "name": "Round Brilliant Cut Diamond",
+    "description": "GIA-standard 57-facet round brilliant cut. Proportions based on Tolkowsky ideal cut (1919) with modern refinements.",
+    "units": "relative (girdle radius = 1.0)",
+    "parameters": {
+        "girdleRadius": 1.0,
+        "tableRatio": 0.57,
+        "crownAngleDeg": 34.5,
+        "pavilionAngleDeg": 40.75,
+        "girdleThickness": 0.025,
+        "symmetryFold": 8,
+        "starFacetLengthRatio": 0.50,
+        "lowerGirdleFacetLengthRatio": 0.75,
+        "culetSizeRatio": 0.0
+    },
+    "notes": [
+        "Crown height derived: girdleRadius * (1 - tableRatio) * tan(crownAngle)",
+        "Pavilion depth derived: girdleRadius * tan(pavilionAngle)",
+        "Vertices and faces are generated parametrically from these parameters.",
+        "All angles in degrees. Convert to radians for computation."
+    ]
+}

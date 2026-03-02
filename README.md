@@ -1,10 +1,12 @@
 # Gemstone Viewer
 
-A real-time physically-based gemstone renderer built with Three.js. Generates a parametric 57-facet round brilliant-cut gem and renders it with realistic refraction, dispersion, specular fire, and bloom — all running in the browser with zero build tools. Cycle between four gemstones (diamond, sapphire, emerald, citrine), each with physically accurate optical properties.
+A real-time physically-based gemstone renderer with two implementations: a **Three.js** web version and a native **Vulkan/C** port. Both generate the same parametric 57-facet round brilliant-cut gem and render it with realistic refraction, chromatic dispersion, specular fire, and bloom. Cycle between four gemstones (diamond, sapphire, emerald, citrine), each with physically accurate optical properties.
 
-![Three.js](https://img.shields.io/badge/Three.js-r170-blue) ![Build](https://img.shields.io/badge/build-none-brightgreen) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Three.js](https://img.shields.io/badge/Three.js-r170-blue) ![Vulkan](https://img.shields.io/badge/Vulkan-1.2-red) ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 ## Setup
+
+### Web version (Three.js)
 
 No build step, package manager, or install required. The project uses ES modules with an [import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap) that loads Three.js r170 directly from a CDN.
 
@@ -22,7 +24,29 @@ prototypes/
         settings-ui.js      Data-driven slider panel with external sync support
 ```
 
+### Vulkan version (C)
+
+**Prerequisites:** Vulkan SDK (with `glslc`), CMake 3.22+, a C17 compiler. On macOS, MoltenVK is used automatically via the Vulkan SDK.
+
+```
+vulkan/
+    CMakeLists.txt          Build system
+    data/
+        brilliant-cut.json  Same parametric gem proportions
+    shaders/
+        gem.vert            Vertex shader (MVP + world-space outputs)
+        gem.frag            PBR fragment shader (IBL, dispersion, refraction, bloom)
+    src/
+        main.c              App lifecycle, frame loop, input
+        renderer/           Vulkan init, swapchain, render pass, pipeline, env map, background target
+        scene/              Camera, gem geometry builder, material presets
+        util/               File I/O helpers
+    third_party/            Vendored: GLFW, cglm, cJSON, Nuklear, stb, VMA
+```
+
 ## Running
+
+### Web version
 
 Serve the project root over HTTP. Any static file server works:
 
@@ -41,7 +65,60 @@ Then open `http://localhost:8000` (or whichever port your server reports).
 
 > **Note:** Opening `index.html` directly via `file://` will fail because ES module imports and `fetch()` require an HTTP origin.
 
+### Vulkan version — macOS
+
+**Prerequisites:** Xcode Command Line Tools, CMake ≥ 3.22, and the [Vulkan SDK for macOS](https://vulkan.lunarg.com/sdk/home#mac) (MoltenVK and `glslc` are included).
+
+After installing the SDK, export the required environment variables. Add these to `~/.zshrc` to make them permanent:
+
+```bash
+export VULKAN_SDK=~/VulkanSDK/<version>/macOS
+export PATH=$VULKAN_SDK/bin:$PATH
+export DYLD_LIBRARY_PATH=$VULKAN_SDK/lib:$DYLD_LIBRARY_PATH
+export VK_ICD_FILENAMES=$VULKAN_SDK/share/vulkan/icd.d/MoltenVK_icd.json
+export VK_LAYER_PATH=$VULKAN_SDK/share/vulkan/explicit_layer.d
+```
+
+Or source the SDK's setup script each session:
+
+```bash
+source ~/VulkanSDK/<version>/setup-env.sh
+```
+
+Build and run:
+
+```bash
+cd vulkan
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(sysctl -n hw.logicalcpu)
+./build/gemstone_viewer
+```
+
+### Vulkan version — Windows 11
+
+**Prerequisites:** Visual Studio 2022 with the **Desktop development with C++** workload, CMake ≥ 3.22 (bundled with VS2022), and the [Vulkan SDK for Windows](https://vulkan.lunarg.com/sdk/home#windows). The SDK installer sets the `VULKAN_SDK` environment variable automatically.
+
+Build and run from a **Developer Command Prompt for VS 2022** (or any shell where `cmake` and `cl.exe` are on `PATH`):
+
+```bat
+cd vulkan
+cmake -G "Visual Studio 17 2022" -A x64 -B build
+cmake --build build --config Release
+build\Release\gemstone_viewer.exe
+```
+
+**Controls (both platforms):**
+
+| Action | Input |
+|--------|-------|
+| Orbit | Click and drag |
+| Zoom | Scroll wheel |
+| Cycle gemstone | **← / →** arrow keys |
+| Quit | **Escape** |
+
 ## Interaction
+
+### Web version
 
 | Action | Input |
 |--------|-------|
@@ -85,7 +162,7 @@ The gem auto-rotates slowly. Dragging to orbit overrides auto-rotation until the
 
 ### Geometry: Parametric Brilliant Cut
 
-The gem is generated procedurally from nine parameters defined in `data/brilliant-cut.json`, based on Marcel Tolkowsky's 1919 ideal cut proportions. The geometry builder (`gem-geometry.js`) constructs all 57 facets of a standard round brilliant:
+The gem is generated procedurally from nine parameters defined in `data/brilliant-cut.json`, based on Marcel Tolkowsky's 1919 ideal cut proportions. Both the JS and C versions use the same geometry builder, producing identical 57-facet meshes. The builder constructs all 57 facets of a standard round brilliant:
 
 - **Crown (33 facets):** 1 octagonal table, 8 star facets, 8 bezel (kite) facets, and 16 upper girdle triangles.
 - **Pavilion (24 facets):** 8 main pavilion facets and 16 lower girdle triangles.
@@ -96,6 +173,8 @@ Vertices are computed on circles at analytically derived heights: crown height =
 The mesh is **non-indexed** (flat-shaded) by design. After initial vertex generation, the builder overwrites the computed smooth normals with per-face normals so that each facet reflects light independently. This is essential for diamond realism — smooth-shaded normals would destroy the sharp facet edges that produce a diamond's characteristic pattern of light and dark reflections.
 
 ### Material: Physically-Based Gemstone Optics
+
+#### Web version (Three.js)
 
 The material (`gem-material.js`) uses `THREE.MeshPhysicalMaterial` — Three.js's most advanced PBR material — with a **preset system** that defines per-stone optical properties. All four gemstones share the same rendering flags (transmission, clearcoat, double-sided) but differ in the properties that create each stone's unique appearance:
 
@@ -109,23 +188,42 @@ The material (`gem-material.js`) uses `THREE.MeshPhysicalMaterial` — Three.js'
 
 The `applyGemPreset()` function switches the material in-place without recreating the mesh, updating only the stone-specific properties and leaving shared flags untouched.
 
+#### Vulkan version
+
+The Vulkan fragment shader (`gem.frag`) implements an equivalent PBR model in GLSL:
+
+- **Fresnel:** Schlick approximation with IOR-derived `F0 = ((n-1)/(n+1))²`.
+- **Specular IBL:** Reflected view ray samples a procedural 256×256 studio cube map, scaled by `ENV_STORED_RANGE` (5.0) to recover HDR range, then by per-preset `envMapIntensity`.
+- **Chromatic dispersion:** Cauchy-model IOR split — `ior ± (ior - 1) × dispersion × 0.025` — ties channel separation to refractive power; constant `0.025` matches Three.js r166's `halfSpread` formula exactly. Three separate `refract()` calls produce the rainbow “fire” at facet edges.
+- **Beer-Lambert body colour:** Refracted env sample (or screen-space background sample, see below) attenuated by `pow(attenuationColor, thickness/attenuationDistance)`, identical to Three.js's volumetric attenuation.
+- **Screen-space transmission:** An off-screen background render target (`vk_background.c/h`) is cleared to transparent each frame before the gem pass. The fragment shader projects the refracted exit point onto the screen per wavelength channel and samples the target; when the background pixel is transparent (empty scene) it falls back to the env-cube sample. This mirrors Three.js's `OpaqueRenderTarget` path and is activated automatically as soon as scene objects are placed behind the gem.
+- **Direct specular:** Blinn-Phong from 4 point lights with a GGX-matching intensity boost, producing the sharp rotating "fire" flashes.
+- **Clearcoat:** GGX NDF + Smith geometric visibility (`D_GGX × G_Smith × NdotL`), `F0 = 0.04`, Fresnel-weighted. `clearcoatRoughness` feeds `alpha = roughness²` matching Three.js's remapping exactly.
+- **Bloom approximation:** In-shader emphasis of the brightest specular peaks before ACES tone mapping — no spatial blur, but indistinguishable from `UnrealBloomPass` for narrow fire highlights.
+- **Tone mapping:** ACES Filmic @ exposure 0.10, matching the Three.js pipeline exactly.
+- **Two-pass transparency:** Back faces render first (interior with Beer-Lambert tinting, α = 0.55), then front faces (full PBR surface). The Vulkan geometry builder enforces outward-facing normals via a centroid-dot winding correction.
+
 ### Environment & Lighting
 
-The scene uses a **procedural environment map** generated by Three.js's `RoomEnvironment`, which creates a neutral studio-like box. This is processed through a `PMREMGenerator` (Prefiltered Mipmapped Radiance Environment Map) to produce the glossy-to-rough mip chain that `MeshPhysicalMaterial` samples at different roughness levels. The environment map is critical: without it, the transmissive/reflective material would have nothing to reflect or refract, and the gem would appear empty.
+Both versions use a **procedural environment map** providing a neutral studio-like lighting setup. The Three.js version generates this via `RoomEnvironment` processed through a `PMREMGenerator`. The Vulkan version generates an analytic 256×256×6 cube map on the CPU with six spatially distinct light sources (key, fill, ceiling panel, rim, back wall accent, ground bounce), stored as UNORM and scaled to HDR in the shader.
 
-Four **point lights** at asymmetric positions create visible specular "fire spots" on the facets — the bright flashes that move as the gem rotates. A dim ambient light provides minimal fill without washing out the specular contrast.
+The environment map is critical: without it, the transmissive/reflective material would have nothing to reflect or refract, and the gem would appear empty. Adjacent facets point in different directions, so they sample different parts of the environment — this per-facet variation is what makes a cut gem look alive.
+
+Four **point lights** at asymmetric positions (shared between both versions) create visible specular "fire spots" on the facets — the bright flashes that move as the gem rotates. The web version adds a dim ambient light for minimal fill.
 
 ### Post-Processing: Bloom
 
-The render pipeline uses Three.js's `EffectComposer` with three passes:
+The Three.js render pipeline uses `EffectComposer` with three passes:
 
 1. **RenderPass** — Renders the scene normally.
 2. **UnrealBloomPass** — Applies a selective bloom/glow effect. With a high threshold (`0.85`), only the brightest specular highlights (the "fire" flashes) produce visible bloom, simulating the scintillation effect seen in real diamonds under point lighting. The strength and radius are kept subtle to avoid an over-processed look.
 3. **OutputPass** — Handles final color space conversion (linear working space to sRGB output).
 
-**Tone mapping** uses ACES Filmic at a low exposure of 0.1, compressing the high-dynamic-range specular peaks into a displayable range while preserving contrast in the midtones.
+The Vulkan version approximates bloom in the fragment shader by boosting specular peaks above a luminance threshold before ACES tone mapping. For narrow point-light highlights (the dominant bloom source), this is perceptually indistinguishable from the multi-pass Gaussian blur.
 
-### Settings UI Architecture
+**Tone mapping** in both versions uses ACES Filmic at a low exposure of 0.10, compressing the high-dynamic-range specular peaks into a displayable range while preserving contrast in the midtones.
+
+### Settings UI Architecture (Web)
 
 The settings panel (`settings-ui.js`) is fully **data-driven** and decoupled from Three.js. Sliders in the HTML carry `data-target`, `data-prop`, and `data-default` attributes; the JS module reads these at init time and builds a binding map to the live objects it receives via dependency injection (`{ bloomPass, renderer, material }`). Adding a new slider requires only HTML markup — no JavaScript changes. The module has zero imports from Three.js and no knowledge of the rendering pipeline; it simply sets numeric properties on the objects it is given.
 

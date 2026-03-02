@@ -1,1 +1,11 @@
+# Private session notes
 .notes/
+
+# macOS Finder metadata — created whenever a directory is browsed in Finder
+.DS_Store
+
+# Web / Node (no package.json today, but prevents accidents if one is added)
+node_modules/
+
+# Editor
+*.log
